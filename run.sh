@@ -175,6 +175,8 @@ app() {
   mkdir -p ./dist
   touch ./dist/ignore
 
+  export VARS="-X main.build_mode=$BUILD_MODE -X main.port=$APP_PORT -X main.server_url=$SERVER_URL"
+
   go build $APP_TAGS -ldflags "$VARS" -o ../build/gravtest ./src/.
   ../build/gravtest $@
 }

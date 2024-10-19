@@ -22,6 +22,8 @@ var server_url string
 type Client struct {
 	client http.Client
 	jwt    string
+	currentUser *user.User
+	availableTests []TEST.Test
 
 	server struct {
 		conn         *websocket.Conn
@@ -91,6 +93,7 @@ func (self *Client) login(user_login *types.TUserLogin) error {
 	}
 
 	url := server_url + "/user/login"
+	// Log the url
 	log.Println(url, string(json_data))
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(json_data))
 	if err != nil {
@@ -114,14 +117,17 @@ func (self *Client) login(user_login *types.TUserLogin) error {
 	}
 
 	var result struct {
-		Message  string `json:"message"`
-		Response string `json:"response"`
-	}
+        Message string      `json:"message"`
+        User    user.User   `json:"user"`
+        Tests   []TEST.Test `json:"tests"`
+    }
 	if err := json.Unmarshal(body, &result); err != nil {
 		return err
 	}
 
-	self.jwt = result.Response
+	self.jwt = "TODO"
+    self.currentUser = &result.User
+    self.availableTests = result.Tests
 
 	return nil
 }

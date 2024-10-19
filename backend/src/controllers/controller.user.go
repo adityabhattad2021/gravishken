@@ -1,28 +1,56 @@
 package controllers
 
 import (
+	"net/http"
+	"context"
 	User "common/models/user"
+	Batch "common/models/batch"
+	Test "common/models/test"
 	"server/src/helper"
 
 	"github.com/gin-gonic/gin"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
-func (this *ControllerClass) UserLoginHandler(ctx *gin.Context, userModel *User.UserLoginRequest) {
-	userCollection := this.UserCollection
-	response, err := helper.UserLogin(userCollection, userModel)
+func (c *ControllerClass) UserLoginHandler(ctx *gin.Context, loginRequest *User.UserLoginRequest) {
+	var foundUser User.User
 
-	if err != nil {
-		ctx.JSON(401, gin.H{
-			"message": "Error in User Login",
-			"error":   err,
-		})
-		return
-	}
+	err := c.UserCollection.FindOne(context.Background(), bson.M{"username": loginRequest.Username}).Decode(&foundUser)
+    if err != nil {
+        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        return
+    }
 
-	ctx.JSON(200, gin.H{
-		"message":  "Admin Login route here",
-		"response": response,
-	})
+	if foundUser.Password != loginRequest.Password {
+        ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+        return
+    }
+
+	var batch Batch.Batch
+    err = c.BatchCollection.FindOne(context.Background(), bson.M{"name": foundUser.Batch}).Decode(&batch)
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch batch information"})
+        return
+    }
+
+	var tests []Test.Test
+    cursor, err := c.TestCollection.Find(context.Background(), bson.M{"_id": bson.M{"$in": batch.Tests}})
+    if err != nil {
+        ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch tests"})
+        return
+    }
+    defer cursor.Close(context.Background())
+
+    if err = cursor.All(context.Background(), &tests); err != nil {
+        ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode tests"})
+        return
+    }
+
+    ctx.JSON(http.StatusOK, gin.H{
+        "message": "Login successful",
+        "user": foundUser,
+        "tests": tests,
+    })
 }
 
 func (this *ControllerClass) UpdateUserData(ctx *gin.Context, userUpdateRequest *User.UserUpdateRequest) {
